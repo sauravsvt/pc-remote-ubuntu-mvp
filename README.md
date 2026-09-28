@@ -28,7 +28,7 @@ You can also open `http://127.0.0.1:8765` on the computer itself and enter the t
 
 If the screen buttons are disabled, the session is Wayland; lock and audio still work. If `DISPLAY` is missing from the user service, import the graphical session's environment, then restart (commands below).
 
-To add another computer, repeat the install there and give that machine its own token and tailnet URL. Save each URL as a browser bookmark or home-screen shortcut. The phone page controls the computer whose URL it opens; there is no central fleet dashboard or cross-machine permission system yet. For someone else's computer, install with their consent and use their own account; do not silently enable unattended access.
+Each computer is an independent install with its own token and tailnet URL; to add another, repeat the install there. `GET /api/status` (token required) reports the API version (`"api": "1"`), the device hostname, and the `actions` that computer's agent supports, and the page shows only those controls. Re-running `bash install.sh` updates the copied files and restarts the service. Save each URL as a browser bookmark or home-screen shortcut. The phone page controls the computer whose URL it opens; there is no central fleet dashboard or cross-machine permission system yet. For someone else's computer, install with their consent and use their own account; do not silently enable unattended access.
 
 This setup uses the Tailscale service for connectivity. The app itself is open source and runs locally. If you later want the network coordination self-hosted too, replace Tailscale with your own WireGuard/Headscale setup.
 

@@ -7,15 +7,117 @@
 <main><h1>PC Remote</h1><p class="sub">Your computers, from your phone</p>
 <section id="setup" class="card"><h2>Connect to this computer</h2><p class="small">Enter the token stored on this PC at <code>~/.config/pc-remote/token</code>. It stays in this browser on this device.</p><div class="input"><input id="token" type="password" autocomplete="off" placeholder="Device token"><button id="connect">Connect</button></div></section>
 <div id="app"><section class="card"><h2>Device</h2><div style="font-size:22px;font-weight:700"><span class="pill"></span><span id="name"></span></div><p id="details" class="small"></p><button id="leaving" class="primary wide">🌙 Leaving — mute, lock, screens off</button></section>
-<section class="card"><h2>Computer</h2><div class="grid"><button data-action="lock">🔒 Lock</button><button data-action="mute">🔇 Mute</button><button data-action="unmute">🔊 Unmute</button></div><p class="small" id="audio"></p><label class="small" for="volume">Volume: <span id="volnum"></span>%</label><input id="volume" type="range" min="0" max="100"></section>
-<section class="card"><h2>Displays</h2><div class="grid"><button data-action="screens-off">🖥 All screens off</button><button data-action="screens-on">☀️ Wake screens</button></div><p id="display-note" class="small"></p><div id="monitors"></div></section><p id="message" role="status"></p><button id="forget" class="wide">Forget token on this phone</button></div>
+<section class="card"><h2>Computer</h2><div id="computer" class="grid"></div><p class="small" id="audio"></p><div id="volume-control"><label class="small" for="volume">Volume: <span id="volnum"></span>%</label><input id="volume" type="range" min="0" max="100"></div></section>
+<section class="card"><h2>Displays</h2><div id="displays" class="grid"></div><p id="display-note" class="small"></p><div id="monitors"></div></section><p id="message" role="status"></p><button id="forget" class="wide">Forget token on this phone</button></div>
 <footer>Only predefined controls are available. The PC keeps running when displays turn off. Connect through a private network.</footer></main>
 <script>
-let key=sessionStorage.getItem('pc-remote-token')||'';
-const $=id=>document.getElementById(id);
-const msg=(s,bad=false)=>{ $('message').textContent=s; $('message').className=bad?'error':'' };
-async function api(path,data){const response=await fetch('/api/'+path,{method:data?'POST':'GET',headers:{'Authorization':'Bearer '+key,...(data?{'Content-Type':'application/json'}:{})},body:data?JSON.stringify(data):undefined,cache:'no-store'});const result=await response.json();if(!response.ok)throw Error(result.error||'Request failed');return result}
-async function refresh(){try{const s=await api('status');$('setup').style.display='none';$('app').style.display='block';$('name').textContent=s.device;$('details').textContent=`Online · Up ${Math.floor(s.uptime_seconds/3600)} hours · ${s.session} session`;$('audio').textContent=s.audio.available?(s.audio.muted?'Muted':'Unmuted'):'Audio unavailable';$('volume').disabled=!s.audio.available;$('volume').value=s.audio.volume??0;$('volnum').textContent=s.audio.volume??'–';document.querySelectorAll('[data-action="screens-off"],[data-action="screens-on"]').forEach(b=>b.disabled=!s.x11);$('display-note').textContent=s.x11?'All screens uses X11 DPMS. Mouse activity may wake them.':'All screens control needs an X11 session; Wayland requires a desktop-specific method.';$('monitors').replaceChildren();for(const monitor of s.monitors){const row=document.createElement('div');row.className='monitor';const label=document.createElement('span');label.textContent=monitor.name;const controls=document.createElement('span');for(const [title,act] of [['Standby','monitor-standby'],['Wake','monitor-on']]){const button=document.createElement('button');button.textContent=title;button.onclick=()=>send(act,{id:monitor.id});controls.append(button)}row.append(label,controls);$('monitors').append(row)}if(s.monitors.length){const p=document.createElement('p');p.className='small';p.textContent='Per-monitor DDC/CI standby depends on the monitor. Test wake while physically nearby; some displays stop accepting commands in standby.';$('monitors').append(p)}}catch(e){$('setup').style.display='block';$('app').style.display='none';msg(e.message,true)}}
-async function send(name,body={}){if((name==='monitor-standby')&&!confirm('Test this while near the monitor first. Continue?'))return;try{msg('Working…');const result=await api(name,body);msg(result.warnings?.length?'Done with limits: '+result.warnings.join('; '):'Done',!!result.warnings?.length);setTimeout(refresh,500)}catch(e){msg(e.message,true)}}
-$('connect').onclick=()=>{key=$('token').value.trim();sessionStorage.setItem('pc-remote-token',key);refresh()};$('token').onkeydown=e=>{if(e.key==='Enter')$('connect').click()};$('leaving').onclick=()=>send('leaving');document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>send(b.dataset.action));$('volume').onchange=e=>send('volume',{value:Number(e.target.value)});$('forget').onclick=()=>{sessionStorage.removeItem('pc-remote-token');key='';location.reload()};if(key)refresh();
+// Simple buttons, keyed by action name. Only actions listed by GET /api/status are shown.
+const BUTTONS = new Map([
+  ['lock', {section: 'computer', label: '🔒 Lock'}],
+  ['mute', {section: 'computer', label: '🔇 Mute'}],
+  ['unmute', {section: 'computer', label: '🔊 Unmute'}],
+  ['screens-off', {section: 'displays', label: '🖥 All screens off', x11: true}],
+  ['screens-on', {section: 'displays', label: '☀️ Wake screens', x11: true}],
+]);
+const MONITOR_BUTTONS = [['Standby', 'monitor-standby'], ['Wake', 'monitor-on']];
+
+let key = sessionStorage.getItem('pc-remote-token') || '';
+const $ = id => document.getElementById(id);
+const msg = (s, bad = false) => { $('message').textContent = s; $('message').className = bad ? 'error' : ''; };
+
+function button(label, onclick) {
+  const b = document.createElement('button');
+  b.textContent = label;
+  b.onclick = onclick;
+  return b;
+}
+
+async function api(path, data) {
+  const response = await fetch('/api/' + path, {
+    method: data ? 'POST' : 'GET',
+    headers: {'Authorization': 'Bearer ' + key, ...(data ? {'Content-Type': 'application/json'} : {})},
+    body: data ? JSON.stringify(data) : undefined,
+    cache: 'no-store',
+  });
+  const result = await response.json();
+  if (!response.ok) throw Error(result.error || 'Request failed');
+  return result;
+}
+
+function render(s) {
+  const supported = new Set(s.actions);
+  $('setup').style.display = 'none';
+  $('app').style.display = 'block';
+  $('name').textContent = s.device;
+  $('details').textContent = `Online · Up ${Math.floor(s.uptime_seconds / 3600)} hours · ${s.session} session`;
+  $('leaving').hidden = !supported.has('leaving');
+
+  $('computer').replaceChildren();
+  $('displays').replaceChildren();
+  for (const name of s.actions) {
+    const spec = BUTTONS.get(name);
+    if (!spec) continue;
+    const b = button(spec.label, () => send(name));
+    b.disabled = !!spec.x11 && !s.x11;
+    $(spec.section).append(b);
+  }
+
+  $('audio').textContent = s.audio.available ? (s.audio.muted ? 'Muted' : 'Unmuted') : 'Audio unavailable';
+  $('volume-control').hidden = !supported.has('volume');
+  $('volume').disabled = !s.audio.available;
+  $('volume').value = s.audio.volume ?? 0;
+  $('volnum').textContent = s.audio.volume ?? '–';
+
+  const screens = supported.has('screens-off') || supported.has('screens-on');
+  $('display-note').textContent = !screens ? '' : s.x11
+    ? 'All screens uses X11 DPMS. Mouse activity may wake them.'
+    : 'All screens control needs an X11 session; Wayland requires a desktop-specific method.';
+
+  $('monitors').replaceChildren();
+  const monitorButtons = MONITOR_BUTTONS.filter(([, name]) => supported.has(name));
+  if (!monitorButtons.length || !s.monitors.length) return;
+  for (const monitor of s.monitors) {
+    const row = document.createElement('div');
+    row.className = 'monitor';
+    const label = document.createElement('span');
+    label.textContent = monitor.name;
+    const controls = document.createElement('span');
+    for (const [title, name] of monitorButtons) controls.append(button(title, () => send(name, {id: monitor.id})));
+    row.append(label, controls);
+    $('monitors').append(row);
+  }
+  const p = document.createElement('p');
+  p.className = 'small';
+  p.textContent = 'Per-monitor DDC/CI standby depends on the monitor. Test wake while physically nearby; some displays stop accepting commands in standby.';
+  $('monitors').append(p);
+}
+
+async function refresh() {
+  try {
+    render(await api('status'));
+  } catch (e) {
+    $('setup').style.display = 'block';
+    $('app').style.display = 'none';
+    msg(e.message, true);
+  }
+}
+
+async function send(name, body = {}) {
+  if (name === 'monitor-standby' && !confirm('Test this while near the monitor first. Continue?')) return;
+  try {
+    msg('Working…');
+    const result = await api(name, body);
+    msg(result.warnings?.length ? 'Done with limits: ' + result.warnings.join('; ') : 'Done', !!result.warnings?.length);
+    setTimeout(refresh, 500);
+  } catch (e) {
+    msg(e.message, true);
+  }
+}
+
+$('connect').onclick = () => { key = $('token').value.trim(); sessionStorage.setItem('pc-remote-token', key); refresh(); };
+$('token').onkeydown = e => { if (e.key === 'Enter') $('connect').click(); };
+$('leaving').onclick = () => send('leaving');
+$('volume').onchange = e => send('volume', {value: Number(e.target.value)});
+$('forget').onclick = () => { sessionStorage.removeItem('pc-remote-token'); key = ''; location.reload(); };
+if (key) refresh();
 </script></html>

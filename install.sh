@@ -3,9 +3,15 @@ set -euo pipefail
 source_dir="$(cd "$(dirname "$0")" && pwd)"
 target_dir="$HOME/.local/share/pc-remote"
 unit_dir="$HOME/.config/systemd/user"
+# Every file the service loads at runtime; test_agent.py parses this line.
+files=(agent.py actions.py index.html)
+for file in "${files[@]}"; do
+  [[ -f "$source_dir/$file" ]] || { echo "Missing $source_dir/$file" >&2; exit 1; }
+done
 mkdir -p "$target_dir" "$unit_dir"
-install -m 600 "$source_dir/agent.py" "$target_dir/agent.py"
-install -m 600 "$source_dir/index.html" "$target_dir/index.html"
+for file in "${files[@]}"; do
+  install -m 600 "$source_dir/$file" "$target_dir/$file"
+done
 cat > "$unit_dir/pc-remote.service" <<EOF
 [Unit]
 Description=Private PC Remote control agent
@@ -21,7 +27,8 @@ RestartSec=3
 WantedBy=default.target
 EOF
 systemctl --user daemon-reload
-systemctl --user enable --now pc-remote.service
+systemctl --user enable pc-remote.service
+systemctl --user restart pc-remote.service
 echo "PC Remote installed at http://127.0.0.1:8765"
 echo "Your private token is in ~/.config/pc-remote/token"
 echo "Read README.md before enabling remote access."
