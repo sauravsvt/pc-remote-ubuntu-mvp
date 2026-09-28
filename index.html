@@ -16,8 +16,8 @@ const BUTTONS = new Map([
   ['lock', {section: 'computer', label: '🔒 Lock'}],
   ['mute', {section: 'computer', label: '🔇 Mute'}],
   ['unmute', {section: 'computer', label: '🔊 Unmute'}],
-  ['screens-off', {section: 'displays', label: '🖥 All screens off', x11: true}],
-  ['screens-on', {section: 'displays', label: '☀️ Wake screens', x11: true}],
+  ['screens-off', {section: 'displays', label: '🖥 All screens off', needsScreen: true}],
+  ['screens-on', {section: 'displays', label: '☀️ Wake screens', needsScreen: true}],
 ]);
 const MONITOR_BUTTONS = [['Standby', 'monitor-standby'], ['Wake', 'monitor-on']];
 
@@ -58,7 +58,7 @@ function render(s) {
     const spec = BUTTONS.get(name);
     if (!spec) continue;
     const b = button(spec.label, () => send(name));
-    b.disabled = !!spec.x11 && !s.x11;
+    b.disabled = !!spec.needsScreen && !s.screens;
     $(spec.section).append(b);
   }
 
@@ -69,7 +69,9 @@ function render(s) {
   $('volnum').textContent = s.audio.volume ?? '–';
 
   const screens = supported.has('screens-off') || supported.has('screens-on');
-  $('display-note').textContent = !screens ? '' : s.x11
+  $('display-note').textContent = !screens ? '' : s.screens && s.platform === 'windows'
+    ? 'All screens uses Windows monitor power. Mouse or keyboard activity may wake them.'
+    : s.screens
     ? 'All screens uses X11 DPMS. Mouse activity may wake them.'
     : 'All screens control needs an X11 session; Wayland requires a desktop-specific method.';
 

@@ -103,6 +103,8 @@ class AgentTests(unittest.TestCase):
             code, status = self.request("GET", "/api/status", headers={"Authorization": "Bearer " + self.agent.SECRET})
         self.assertEqual(code, 200)
         self.assertEqual(status["api"], "1")
+        self.assertEqual(status["platform"], "linux")
+        self.assertEqual(status["screens"], status["x11"])
         self.assertEqual(status["device"], socket.gethostname())
         self.assertEqual(status["actions"], list(self.actions.ACTIONS))
         self.assertLessEqual({"lock", "mute", "unmute", "volume", "screens-off", "screens-on",
@@ -113,6 +115,67 @@ class AgentTests(unittest.TestCase):
         self.assertIsNotNone(match, "install.sh must declare files=(...)")
         runtime = {p.name for p in ROOT.glob("*.py") if not p.name.startswith("test_")} | {"index.html"}
         self.assertLessEqual(runtime, set(match.group(1).split()))
+
+
+class WindowsActionTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("windows_actions", ROOT / "windows_actions.py")
+        cls.win = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.win)
+
+    def test_windows_actions_are_the_shared_set_without_monitors(self):
+        self.assertEqual(set(self.win.ACTIONS),
+                         {"lock", "mute", "unmute", "volume", "screens-off", "screens-on", "leaving"})
+        self.assertEqual(self.win.monitors(), [])
+        self.assertFalse(self.win.x11_available())
+        self.assertFalse(self.win.screens_available())
+
+    def test_volume_stays_a_fixed_script_argument(self):
+        script = str(ROOT / "windows_audio.ps1")
+        expected = ["powershell.exe", "-NoProfile", "-NonInteractive", "-STA", "-ExecutionPolicy", "Bypass",
+                    "-File", script, "-Action", "set", "-Value", "42"]
+        with patch.object(self.win, "run") as cmd:
+            self.assertEqual(self.win.set_volume({"value": 42}), None)
+            cmd.assert_called_once_with(expected)
+            cmd.reset_mock()
+            with self.assertRaises(ValueError):
+                self.win.set_volume({"value": "; id"})
+            with self.assertRaises(ValueError):
+                self.win.set_volume({"value": True})
+            cmd.assert_not_called()
+        text = (ROOT / "windows_audio.ps1").read_text()
+        self.assertIn("ValidateSet('get', 'set', 'mute', 'unmute')", text)
+        self.assertNotIn("Invoke-Expression", text)
+
+    def test_leaving_mutes_locks_and_turns_screens_off(self):
+        with patch.object(self.win, "run") as cmd, \
+                patch.object(self.win, "lock_workstation") as lock, \
+                patch.object(self.win, "set_screen_power") as screens:
+            result = self.win.leaving()
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["warnings"], [])
+        cmd.assert_called_once()
+        self.assertEqual(cmd.call_args.args[0][cmd.call_args.args[0].index("-Action") + 1], "mute")
+        lock.assert_called_once_with()
+        screens.assert_called_once_with("off")
+
+    def test_windows_installer_copies_the_audio_script(self):
+        text = (ROOT / "install.ps1").read_text()
+        for name in ("agent.py", "windows_actions.py", "windows_audio.ps1", "index.html"):
+            self.assertIn(name, text)
+
+    def test_public_installers_download_this_repo(self):
+        linux = (ROOT / "site" / "install.sh").read_text()
+        windows = (ROOT / "site" / "install.ps1").read_text()
+        page = (ROOT / "site" / "index.html").read_text()
+        self.assertIn("sauravsvt/pc-remote-ubuntu-mvp", linux)
+        self.assertIn('bash "$src/install.sh"', linux)
+        self.assertIn("sauravsvt/pc-remote-ubuntu-mvp", windows)
+        self.assertIn("install.ps1", windows)
+        self.assertIn("https://pcremote.voxonlabs.com/install.sh", page)
+        self.assertIn("https://tailscale.com/download", page)
+        self.assertIn("tailscale serve --bg http://127.0.0.1:8765", page)
 
 
 if __name__ == "__main__":

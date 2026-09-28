@@ -1,6 +1,8 @@
 # PC Remote — small Ubuntu prototype
 
-A local phone-sized control page for one Ubuntu computer. Install it independently on each machine. It has no account server, cloud database, remote shell, AI agent, terminal, or background screen streaming. Source is MIT licensed.
+A local phone-sized control page for one computer. Install it independently on each machine. Ubuntu is the system this has been used on; Windows uses the same page and the same action names. It has no account server, cloud database, remote shell, AI agent, terminal, or background screen streaming. Source is MIT licensed.
+
+The public homepage is in [`site/`](site/index.html). It is meant to be served at `https://pcremote.voxonlabs.com/`. `site/install.sh` and `site/install.ps1` download this repository and run the installer for that system. The page includes the Tailscale steps for the computer and the phone.
 
 ## Connect from your phone
 
@@ -39,7 +41,7 @@ This setup uses the Tailscale service for connectivity. The app itself is open s
 - All displays off/on using X11 DPMS, while the computer and running jobs continue
 - Discover DDC/CI displays; per-display standby/wake is experimental and requires a physical test on each monitor
 
-**Display limitations:** X11 DPMS affects all displays and mouse movement can wake them. On Wayland, the screen buttons are disabled; lock and audio still work. DDC/CI standby support varies by display, graphics adapter, cable, and monitor setting. A monitor may stop responding to DDC commands while asleep. Try its Wake button while at the desk before relying on it remotely. The app reports a command's success, not measured power consumption or confirmed screen state. Laptop built-in displays typically do not appear in DDC discovery.
+**Display limitations:** On Ubuntu, X11 DPMS affects all displays and mouse movement can wake them. On Wayland, the screen buttons are disabled; lock and audio still work. DDC/CI standby support varies by display, graphics adapter, cable, and monitor setting. A monitor may stop responding to DDC commands while asleep. Try its Wake button while at the desk before relying on it remotely. The app reports a command's success, not measured power consumption or confirmed screen state. Laptop built-in displays typically do not appear in DDC discovery. On Windows, screen actions turn every display off or on together, and per-monitor DDC/CI buttons are not offered. Mouse or keyboard activity may wake the displays.
 
 ## Install on Ubuntu desktop
 
@@ -61,9 +63,27 @@ systemctl --user import-environment DISPLAY XAUTHORITY XDG_SESSION_TYPE
 systemctl --user restart pc-remote.service
 ```
 
+## Install on Windows
+
+Install Python 3 from python.org and enable **Add python.exe to PATH**, including `pythonw.exe`. Install Tailscale on that PC and on the phone, on the same tailnet. From this directory in PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install.ps1
+Get-Content "$env:APPDATA\pc-remote\token"
+```
+
+The installer copies the app to `%LOCALAPPDATA%\pc-remote` and starts it when you sign in. Open `http://127.0.0.1:8765` on that PC, enter the token, then expose it to your tailnet only:
+
+```powershell
+tailscale serve --bg http://127.0.0.1:8765
+tailscale serve status
+```
+
+Open the HTTPS tailnet URL on the phone and enter the token. These Windows commands still need a first check on a Windows PC: lock, volume, and all-screens power. If the page does not open, run `python agent.py` from `%LOCALAPPDATA%\pc-remote` in a console to see the error. Per-monitor DDC/CI is part of the Ubuntu install only.
+
 ## Safety and boundaries
 
-The HTTP server binds only to `127.0.0.1`, checks a 256-bit token on each API call, requires matching browser Origin for actions, and accepts only known operations with validated numeric inputs. It never executes supplied shell text. The token file is created with mode 0600; losing the phone browser token can be handled by restarting the service after replacing `~/.config/pc-remote/token`, then entering the new token on your phone. Revoking a Tailscale device separately removes its network access.
+The HTTP server binds only to `127.0.0.1`, checks a 256-bit token on each API call, requires matching browser Origin for actions, and accepts only known operations with validated numeric inputs. It never executes supplied shell text. On Ubuntu the token file is created with mode 0600 at `~/.config/pc-remote/token`. On Windows it is created at `%APPDATA%\pc-remote\token` and restricted to the current user. Losing the phone browser token can be handled by restarting the service after replacing that file, then entering the new token on your phone. Revoking a Tailscale device separately removes its network access.
 
 There is no suspend, reboot, shutdown, application launch, terminal, project agent, or remote desktop in this prototype. Those should follow actual use and a separate permission design. Locking, Wayland display control, and per-monitor wake behavior should be verified on your hardware.
 
@@ -78,3 +98,10 @@ systemctl --user daemon-reload
 ```
 
 `tailscale serve reset` removes **all** Serve configurations on that host, so skip it if you use Serve for other services and remove only this route through your current Tailscale configuration instead.
+
+On Windows:
+
+```powershell
+Unregister-ScheduledTask -TaskName "PC Remote" -Confirm:$false
+Remove-Item -Recurse -Force "$env:LOCALAPPDATA\pc-remote", "$env:APPDATA\pc-remote"
+```

@@ -4,7 +4,7 @@ source_dir="$(cd "$(dirname "$0")" && pwd)"
 target_dir="$HOME/.local/share/pc-remote"
 unit_dir="$HOME/.config/systemd/user"
 # Every file the service loads at runtime; test_agent.py parses this line.
-files=(agent.py actions.py index.html)
+files=(agent.py actions.py windows_actions.py index.html)
 for file in "${files[@]}"; do
   [[ -f "$source_dir/$file" ]] || { echo "Missing $source_dir/$file" >&2; exit 1; }
 done

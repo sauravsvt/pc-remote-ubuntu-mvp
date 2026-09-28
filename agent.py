@@ -1,32 +1,66 @@
 #!/usr/bin/env python3
-"""Small, local-only Ubuntu control service. Python standard library only."""
+"""Small, local-only control service for Ubuntu and Windows. Python standard library only."""
 import hmac
 import json
 import os
 import secrets
 import socket
+import subprocess
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
-import actions
+if sys.platform == "win32":
+    import windows_actions as actions
+else:
+    import actions
 
 API_VERSION = "1"
 HOST = "127.0.0.1"
 PORT = int(os.environ.get("PC_REMOTE_PORT", "8765"))
-DATA = Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "pc-remote"
-TOKEN_FILE = DATA / "token"
 UI = Path(__file__).with_name("index.html")
 
 
+def config_dir():
+    if sys.platform == "win32":
+        base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+        return Path(base) / "pc-remote"
+    return Path(os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))) / "pc-remote"
+
+
+DATA = config_dir()
+TOKEN_FILE = DATA / "token"
+
+
+def restrict_windows(path):
+    user = os.environ.get("USERNAME", "")
+    domain = os.environ.get("USERDOMAIN", "")
+    if not user or any(char in user + domain for char in '"/:*?<>|'):
+        raise RuntimeError("Cannot protect the token file for this user")
+    account = f"{domain}\\{user}" if domain else user
+    completed = subprocess.run(
+        ["icacls", str(path), "/inheritance:r", "/grant:r", f"{account}:(R,W)"],
+        capture_output=True, text=True, timeout=15, check=False,
+    )
+    if completed.returncode != 0:
+        raise RuntimeError("Could not restrict the token file to the current user")
+
+
 def token():
-    DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
-    os.chmod(DATA, 0o700)
+    if os.name == "nt":
+        DATA.mkdir(parents=True, exist_ok=True)
+        restrict_windows(DATA)
+    else:
+        DATA.mkdir(mode=0o700, parents=True, exist_ok=True)
+        os.chmod(DATA, 0o700)
     if not TOKEN_FILE.exists():
         fd = os.open(TOKEN_FILE, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         with os.fdopen(fd, "w") as f:
             f.write(secrets.token_urlsafe(32) + "\n")
-    if TOKEN_FILE.stat().st_mode & 0o077:
+    if os.name == "nt":
+        restrict_windows(TOKEN_FILE)
+    elif TOKEN_FILE.stat().st_mode & 0o077:
         raise RuntimeError("Token file must be private (chmod 600)")
     return TOKEN_FILE.read_text().strip()
 
@@ -34,15 +68,24 @@ def token():
 SECRET = token()
 
 
-def status():
-    up = 0
+def uptime_seconds():
+    if sys.platform == "win32":
+        import ctypes
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetTickCount64.restype = ctypes.c_ulonglong
+        return int(kernel32.GetTickCount64() // 1000)
     try:
-        up = int(float(Path("/proc/uptime").read_text().split()[0]))
+        return int(float(Path("/proc/uptime").read_text().split()[0]))
     except (OSError, ValueError, IndexError):
-        pass
-    return {"api": API_VERSION, "device": socket.gethostname(), "actions": list(actions.ACTIONS),
-            "uptime_seconds": up, "audio": actions.audio(), "monitors": actions.monitors(),
-            "x11": actions.x11_available(), "session": os.environ.get("XDG_SESSION_TYPE", "unknown")}
+        return 0
+
+
+def status():
+    session = "windows" if sys.platform == "win32" else os.environ.get("XDG_SESSION_TYPE", "unknown")
+    return {"api": API_VERSION, "platform": "windows" if sys.platform == "win32" else "linux",
+            "device": socket.gethostname(), "actions": list(actions.ACTIONS),
+            "uptime_seconds": uptime_seconds(), "audio": actions.audio(), "monitors": actions.monitors(),
+            "screens": actions.screens_available(), "x11": actions.x11_available(), "session": session}
 
 
 def dispatch(name, body):

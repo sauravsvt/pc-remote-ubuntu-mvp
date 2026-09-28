@@ -56,6 +56,10 @@ def x11_available():
     return bool(os.environ.get("DISPLAY")) and bool(shutil.which("xset"))
 
 
+def screens_available():
+    return x11_available()
+
+
 def lock():
     run(["loginctl", "lock-sessions"])
 

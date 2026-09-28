@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PC Remote — Your computer, from your phone</title>
+  <meta name="description" content="PC Remote by Voxon Labs. A local page to lock, mute, and turn off the screens of one Linux or Windows computer. Reach it from your phone over Tailscale.">
+  <link rel="canonical" href="https://pcremote.voxonlabs.com/">
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pcremote.voxonlabs.com/">
+  <meta property="og:title" content="PC Remote — Your computer, from your phone">
+  <meta property="og:description" content="Lock, mute, and turn the screens off. The computer stays on. The page stays on that machine.">
+  <meta property="og:image" content="https://voxonlabs.com/logo-square.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --voxon-chalk: #F9F9F8;
+      --voxon-mist: #F2F2F0;
+      --voxon-fog: #E5E5E1;
+      --voxon-line: #D6D6D1;
+      --voxon-muted: #8E918B;
+      --voxon-slate: #5F635D;
+      --voxon-graphite: #323531;
+      --voxon-ink: #111317;
+      --bg-canvas: var(--voxon-chalk);
+      --bg-surface: #FFFFFF;
+      --bg-subtle: var(--voxon-mist);
+      --bg-card: #FFFFFF;
+      --border-subtle: var(--voxon-fog);
+      --border-medium: var(--voxon-line);
+      --text-primary: var(--voxon-ink);
+      --text-secondary: var(--voxon-slate);
+      --text-muted: var(--voxon-muted);
+      --btn-primary-bg: var(--voxon-ink);
+      --btn-primary-text: #FFFFFF;
+      --btn-primary-hover: #22262F;
+      --btn-secondary-bg: #FFFFFF;
+      --btn-secondary-text: var(--voxon-ink);
+      --btn-secondary-border: var(--voxon-line);
+      --btn-secondary-hover: var(--voxon-mist);
+      --code-bg: var(--voxon-mist);
+      --code-text: var(--voxon-graphite);
+      --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --font-mono: "JetBrains Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --radius-sm: 4px;
+      --radius-md: 6px;
+    }
+    [data-theme="dark"] {
+      --bg-canvas: #0C0E12;
+      --bg-surface: #12151B;
+      --bg-subtle: #171B23;
+      --bg-card: #13161D;
+      --border-subtle: #202632;
+      --border-medium: #2F3747;
+      --text-primary: #F9F9F8;
+      --text-secondary: #9DA3AF;
+      --text-muted: #6B7280;
+      --btn-primary-bg: #F9F9F8;
+      --btn-primary-text: #0C0E12;
+      --btn-primary-hover: #E5E5E1;
+      --btn-secondary-bg: #13161D;
+      --btn-secondary-text: #F9F9F8;
+      --btn-secondary-border: #2F3747;
+      --btn-secondary-hover: #1E232E;
+      --code-bg: #151922;
+      --code-text: #E5E5E1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-font-smoothing: antialiased; scroll-behavior: smooth; }
+    body {
+      min-height: 100vh;
+      font-family: var(--font-sans);
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      line-height: 1.6;
+    }
+    a { color: inherit; }
+    .container { width: 100%; max-width: 860px; margin: 0 auto; padding: 0 1.5rem; }
+    header { border-bottom: 1px solid var(--border-subtle); background: var(--bg-canvas); }
+    .nav { height: 64px; display: flex; align-items: center; justify-content: space-between; }
+    .brand { display: inline-flex; align-items: center; gap: 0.75rem; color: var(--text-primary); text-decoration: none; }
+    .brand-mark { width: 26px; height: 26px; flex-shrink: 0; }
+    .brand-name { font-size: 0.9375rem; font-weight: 700; letter-spacing: 0.08em; }
+    .brand-sep { color: var(--text-muted); font-weight: 400; }
+    .brand-product { font-weight: 600; letter-spacing: 0; }
+    .nav-actions { display: flex; align-items: center; gap: 0.75rem; }
+    .nav-link { font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); text-decoration: none; }
+    .nav-link:hover { color: var(--text-primary); }
+    .theme-toggle {
+      width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center;
+      border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);
+      background: var(--bg-surface); color: var(--text-secondary); cursor: pointer;
+    }
+    .theme-toggle:hover { color: var(--text-primary); border-color: var(--border-medium); }
+    .icon-sun { display: none; }
+    [data-theme="dark"] .icon-sun { display: block; }
+    [data-theme="dark"] .icon-moon { display: none; }
+    main { flex: 1; padding: 4.5rem 0 4rem; }
+    .eyebrow {
+      display: inline-flex; font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-secondary); margin-bottom: 0.75rem;
+    }
+    h1 {
+      font-size: clamp(2.25rem, 4.5vw, 3.25rem); font-weight: 700; letter-spacing: -0.03em;
+      line-height: 1.15; margin-bottom: 1.25rem;
+    }
+    h2 { font-size: 1.5rem; letter-spacing: -0.03em; margin: 2.75rem 0 0.75rem; }
+    .lede { color: var(--text-secondary); font-size: 1.1875rem; line-height: 1.6; max-width: 640px; margin-bottom: 1.75rem; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .tab {
+      border: 1px solid var(--border-medium); background: var(--bg-surface); color: var(--text-secondary);
+      border-radius: var(--radius-sm); padding: 0.45rem 0.8rem; font: inherit; font-size: 0.875rem; font-weight: 600; cursor: pointer;
+    }
+    .tab[aria-selected="true"] { background: var(--btn-primary-bg); color: var(--btn-primary-text); border-color: var(--btn-primary-bg); }
+    .code-card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); overflow: hidden; }
+    .code-bar {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 0.75rem 1rem; border-bottom: 1px solid var(--border-subtle); background: var(--bg-subtle);
+    }
+    .code-label {
+      font-family: var(--font-mono); font-size: 0.75rem; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--text-muted);
+    }
+    .copy-btn {
+      border: 1px solid var(--btn-secondary-border); background: var(--btn-secondary-bg); color: var(--btn-secondary-text);
+      border-radius: var(--radius-sm); padding: 0.4rem 0.7rem; font-size: 0.8125rem; font-weight: 600; cursor: pointer;
+    }
+    .copy-btn:hover { background: var(--btn-secondary-hover); }
+    pre {
+      padding: 1.25rem 1rem 1.35rem; overflow-x: auto; font-family: var(--font-mono);
+      font-size: 0.85rem; line-height: 1.7; color: var(--code-text); background: var(--code-bg);
+    }
+    .features { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1.5rem 0 0; }
+    .card { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.5rem; }
+    .card h2 { font-size: 1.125rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 0.5rem; }
+    .card p, .step p, .note { color: var(--text-secondary); font-size: 0.9375rem; }
+    .steps { list-style: none; display: grid; gap: 1rem; margin-top: 1rem; }
+    .step { background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 1.25rem 1.35rem; }
+    .step h3 { font-size: 1.05rem; margin-bottom: 0.35rem; }
+    .step a { color: var(--text-primary); }
+    [data-os="linux"] .only-windows, [data-os="windows"] .only-linux { display: none; }
+    footer { border-top: 1px solid var(--border-subtle); padding: 1.5rem 0 2rem; font-size: 0.8125rem; color: var(--text-muted); }
+    .footer-row { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+    footer a { color: var(--text-secondary); text-decoration: none; }
+    footer a:hover { color: var(--text-primary); }
+    @media (max-width: 640px) {
+      main { padding-top: 3.5rem; }
+      .features { grid-template-columns: 1fr; }
+      .brand-name { font-size: 0.8125rem; }
+    }
+  </style>
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("voxon-theme");
+        if (stored === "dark" || stored === "light") {
+          document.documentElement.setAttribute("data-theme", stored);
+          return;
+        }
+        document.documentElement.setAttribute(
+          "data-theme",
+          window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"
+        );
+      } catch (_) {}
+    })();
+  </script>
+</head>
+<body>
+  <header>
+    <div class="container nav">
+      <a class="brand" href="https://voxonlabs.com" aria-label="Voxon Labs">
+        <svg class="brand-mark" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="50" cy="50" r="44" stroke-width="6"></circle>
+          <path d="M 50 18 C 36 18, 26 28, 22 42 C 19 52, 14 55, 14 50 C 14 45, 20 42, 28 50 C 34 56, 42 78, 50 78 C 58 78, 66 56, 72 50 C 80 42, 86 45, 86 50 C 86 55, 81 52, 78 42 C 74 28, 64 18, 50 18 Z" stroke-width="5"></path>
+          <path d="M 28 50 C 20 58, 14 55, 14 50" stroke-width="5"></path>
+          <path d="M 72 50 C 80 58, 86 55, 86 50" stroke-width="5"></path>
+        </svg>
+        <span class="brand-name">VOXON LABS <span class="brand-sep">/</span> <span class="brand-product">PC Remote</span></span>
+      </a>
+      <div class="nav-actions">
+        <a class="nav-link" href="#phone">Steps</a>
+        <a class="nav-link" href="https://github.com/sauravsvt/pc-remote-ubuntu-mvp">Source</a>
+        <button class="theme-toggle" id="themeToggle" type="button" aria-label="Toggle color theme">
+          <svg class="icon-sun" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"></path>
+          </svg>
+          <svg class="icon-moon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="container" data-os="linux" id="guide">
+      <p class="eyebrow">Public work · Linux and Windows</p>
+      <h1>Your computer, from your phone.</h1>
+      <p class="lede">PC Remote is a local page for one computer. It can lock the session, change the volume, and turn the screens off. The computer keeps running. Nothing is streamed.</p>
+
+      <div class="tabs" role="tablist" aria-label="Operating system">
+        <button class="tab" id="tab-linux" type="button" role="tab" aria-selected="true" aria-controls="install-command">Linux</button>
+        <button class="tab" id="tab-windows" type="button" role="tab" aria-selected="false" aria-controls="install-command">Windows</button>
+      </div>
+      <section class="code-card" aria-label="Install command">
+        <div class="code-bar">
+          <span class="code-label" id="install-label">install.sh</span>
+          <button type="button" class="copy-btn" id="copy">Copy command</button>
+        </div>
+        <pre id="install-command">curl -fsSL https://pcremote.voxonlabs.com/install.sh | bash</pre>
+      </section>
+
+      <div class="features">
+        <article class="card">
+          <h2>Lock and sound</h2>
+          <p>Lock the session, mute, unmute, and set the volume. Leaving does those and turns the screens off in one tap.</p>
+        </article>
+        <article class="card">
+          <h2>Screens off</h2>
+          <p>The displays go dark and the computer stays on. On Linux, individual monitor buttons appear when DDC/CI can see them.</p>
+        </article>
+      </div>
+      <p class="note" style="margin-top:1rem">Ubuntu is the system this has been used on. Windows uses the same buttons; try lock, volume, and screens once while you are at the desk. Review the installer before piping it to a shell.</p>
+
+      <h2 id="phone">Use it from your phone</h2>
+      <ol class="steps">
+        <li class="step">
+          <h3>1. Install it on the computer</h3>
+          <p>Run the command above while you are signed in to the desktop. Then read the token and keep it on that machine.</p>
+          <pre class="only-linux">cat ~/.config/pc-remote/token</pre>
+          <pre class="only-windows">Get-Content "$env:APPDATA\pc-remote\token"</pre>
+          <p>Open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a> on that computer and enter the token. If this page does not load, the install did not finish.</p>
+        </li>
+        <li class="step">
+          <h3>2. Install Tailscale on that computer</h3>
+          <p class="only-linux">Install Tailscale for Linux from <a href="https://tailscale.com/download/linux">tailscale.com/download/linux</a>, then sign in:</p>
+          <pre class="only-linux">curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up</pre>
+          <p class="only-windows">Install Tailscale for Windows from <a href="https://tailscale.com/download/windows">tailscale.com/download/windows</a> and sign in in the Tailscale window.</p>
+          <p>Use the account you will also use on the phone. Review Tailscale’s installer before piping it, the same way you review this one.</p>
+        </li>
+        <li class="step">
+          <h3>3. Install Tailscale on the phone</h3>
+          <p>Install the Tailscale app from the <a href="https://tailscale.com/download">App Store or Google Play</a> and sign in to the same account. The phone and the computer should both show as connected in the Tailscale app.</p>
+        </li>
+        <li class="step">
+          <h3>4. Give the phone a private address</h3>
+          <p>On the computer, this publishes the page to your tailnet only. It does not put port 8765 on the public internet.</p>
+          <pre>tailscale serve --bg http://127.0.0.1:8765
+tailscale serve status</pre>
+          <p class="only-windows">If PowerShell cannot find <code>tailscale</code>, use <code>&amp; "C:\Program Files\Tailscale\tailscale.exe"</code> in place of <code>tailscale</code>.</p>
+          <p>If the command says permission denied, run it with administrator rights. Do not run <code>tailscale funnel</code>, and do not forward port 8765 on your router.</p>
+        </li>
+        <li class="step">
+          <h3>5. Open it and keep the token</h3>
+          <p><code>tailscale serve status</code> prints an HTTPS address ending in <code>ts.net</code>. Open that address in the phone’s browser, enter the token from step 1, and use the browser menu to add the page to the home screen.</p>
+          <p>The token stays in that browser until you close the session or press Forget token. Do not send the token in a chat or a screenshot.</p>
+        </li>
+      </ol>
+    </div>
+  </main>
+
+  <footer>
+    <div class="container footer-row">
+      <span>A public project by <a href="https://voxonlabs.com">Voxon Labs</a> · MIT</span>
+      <span>
+        <a href="https://github.com/sauravsvt/pc-remote-ubuntu-mvp">GitHub</a>
+        ·
+        <a href="https://github.com/sauravsvt/pc-remote-ubuntu-mvp/blob/main/LICENSE">License</a>
+        ·
+        <a href="https://voxonlabs.com/commons">Public work</a>
+      </span>
+    </div>
+  </footer>
+
+  <script>
+    const commands = {
+      linux: "curl -fsSL https://pcremote.voxonlabs.com/install.sh | bash",
+      windows: "powershell -ExecutionPolicy Bypass -c \"irm https://pcremote.voxonlabs.com/install.ps1 | iex\""
+    };
+    const labels = { linux: "install.sh", windows: "install.ps1" };
+    const guide = document.getElementById("guide");
+    const command = document.getElementById("install-command");
+    const label = document.getElementById("install-label");
+    const copy = document.getElementById("copy");
+
+    function selectOs(os) {
+      guide.dataset.os = os;
+      command.textContent = commands[os];
+      label.textContent = labels[os];
+      document.getElementById("tab-linux").setAttribute("aria-selected", os === "linux" ? "true" : "false");
+      document.getElementById("tab-windows").setAttribute("aria-selected", os === "windows" ? "true" : "false");
+      copy.textContent = "Copy command";
+    }
+    document.getElementById("tab-linux").addEventListener("click", () => selectOs("linux"));
+    document.getElementById("tab-windows").addEventListener("click", () => selectOs("windows"));
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(command.textContent);
+        copy.textContent = "Copied";
+        setTimeout(() => { copy.textContent = "Copy command"; }, 1600);
+      } catch {
+        copy.textContent = "Copy failed";
+      }
+    });
+    document.getElementById("themeToggle").addEventListener("click", () => {
+      const current = document.documentElement.getAttribute("data-theme") || "light";
+      const next = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      localStorage.setItem("voxon-theme", next);
+    });
+  </script>
+</body>
+</html>
