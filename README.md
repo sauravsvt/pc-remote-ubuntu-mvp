@@ -43,26 +43,20 @@ Review [`site/install.sh`](site/install.sh) before piping it to a shell. It down
 
 ## Install on Windows
 
-Install Python 3 from [python.org](https://www.python.org/downloads/windows/) and enable **Add python.exe to PATH**, including `pythonw.exe`. From this directory in PowerShell:
+Download this repository, extract it, and double-click `install.cmd`. If Python 3 is missing, that installs the official Python 3.14 build for the current user, then starts PC Remote at sign-in. You do not change system execution policy or PATH by hand.
 
-```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1
-Get-Content "$env:APPDATA\pc-remote\token"
-```
-
-The installer copies the application to `%LOCALAPPDATA%\pc-remote` and starts it at sign-in. Open `http://127.0.0.1:8765` on that PC and enter the token. If the page does not load, run `python agent.py` from `%LOCALAPPDATA%\pc-remote` in a console and read the error.
-
-Download the repository in the browser or with `Invoke-WebRequest`, extract it, and run `install.ps1` from that folder. Do not pipe a remote script into `iex`. Windows Defender treats that pattern as a trojan dropper and blocks `powershell.exe`.
+From PowerShell, the same steps are:
 
 ```powershell
 cd $env:USERPROFILE\Downloads
 Invoke-WebRequest https://github.com/sauravsvt/pc-remote-ubuntu-mvp/archive/refs/heads/main.zip -OutFile pc-remote.zip
 Expand-Archive .\pc-remote.zip -DestinationPath . -Force
-cd .\pc-remote-ubuntu-mvp-main
-Unblock-File .\install.ps1
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-.\install.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\pc-remote-ubuntu-mvp-main\install.ps1
 ```
+
+Do not pipe a remote script into `iex`. Windows Defender treats that pattern as a trojan dropper and blocks `powershell.exe`.
+
+The app is copied to `%LOCALAPPDATA%\pc-remote`. Open `http://127.0.0.1:8765` on that PC and enter the token printed at the end, which is also in `%APPDATA%\pc-remote\token`. If the page does not load, run `python agent.py` from `%LOCALAPPDATA%\pc-remote` in a console and read the error.
 
 ## Connect a phone
 

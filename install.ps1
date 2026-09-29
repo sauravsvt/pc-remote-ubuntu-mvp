@@ -37,8 +37,35 @@ function Find-Pythonw {
   }
   return $null
 }
+function Install-Python {
+  $arch = if ($env:PROCESSOR_ARCHITECTURE -eq "ARM64") { "arm64" } else { "amd64" }
+  $version = "3.14.7"
+  $name = "python-$version-$arch.exe"
+  $dest = Join-Path $env:TEMP $name
+  Write-Output "Python 3 was not found. Downloading the official Python $version installer..."
+  Invoke-WebRequest -Uri "https://www.python.org/ftp/python/$version/$name" -OutFile $dest
+  $signature = Get-AuthenticodeSignature -FilePath $dest
+  $trusted = $signature.Status -eq "Valid" -and $signature.SignerCertificate -and ($signature.SignerCertificate.Subject -match "Python Software Foundation")
+  if (-not $trusted) {
+    Remove-Item -LiteralPath $dest -Force
+    throw "The Python installer signature was not valid. Nothing was installed."
+  }
+  Write-Output "Installing Python for the current user. A progress window will appear."
+  $proc = Start-Process -FilePath $dest -ArgumentList @(
+    "/passive", "InstallAllUsers=0", "PrependPath=1", "Include_launcher=1", "Include_test=0", "Include_doc=0"
+  ) -Wait -PassThru
+  if ($proc.ExitCode -ne 0 -and $proc.ExitCode -ne 3010) {
+    throw "The Python installer exited with code $($proc.ExitCode)."
+  }
+  $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+}
+
 $pythonw = Find-Pythonw
-if (-not $pythonw) { throw "pythonw.exe was not found. Install Python 3 from https://www.python.org/downloads/windows/ and enable Add python.exe to PATH, then open a new PowerShell window." }
+if (-not $pythonw) {
+  Install-Python
+  $pythonw = Find-Pythonw
+}
+if (-not $pythonw) { throw "Python 3 was installed, but pythonw.exe still could not be found." }
 Get-CimInstance Win32_Process | Where-Object {
   $_.CommandLine -and $_.CommandLine.Contains((Join-Path $target "agent.py"))
 } | ForEach-Object {

@@ -164,6 +164,9 @@ class WindowsActionTests(unittest.TestCase):
         text = (ROOT / "install.ps1").read_text()
         for name in ("agent.py", "windows_actions.py", "windows_audio.ps1", "index.html"):
             self.assertIn(name, text)
+        self.assertIn("https://www.python.org/ftp/python/", text)
+        self.assertIn("Python Software Foundation", text)
+        self.assertNotIn("iex", text.lower())
 
     def test_public_installers_download_this_repo(self):
         linux = (ROOT / "site" / "install.sh").read_text()
