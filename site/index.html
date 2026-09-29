@@ -300,14 +300,40 @@ tailscale serve status</pre>
     }
     document.getElementById("tab-linux").addEventListener("click", () => selectOs("linux"));
     document.getElementById("tab-windows").addEventListener("click", () => selectOs("windows"));
-    copy.addEventListener("click", async () => {
-      try {
-        await navigator.clipboard.writeText(command.textContent);
-        copy.textContent = "Copied";
-        setTimeout(() => { copy.textContent = "Copy command"; }, 1600);
-      } catch {
-        copy.textContent = "Copy failed";
+    function copyWithSelection(text) {
+      const area = document.createElement("textarea");
+      area.value = text;
+      area.setAttribute("readonly", "");
+      area.style.position = "fixed";
+      area.style.top = "0";
+      area.style.left = "0";
+      area.style.opacity = "0";
+      document.body.appendChild(area);
+      area.focus();
+      area.select();
+      const ok = document.execCommand("copy");
+      area.remove();
+      if (!ok) {
+        const range = document.createRange();
+        range.selectNodeContents(command);
+        const selection = window.getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
       }
+      return ok;
+    }
+    copy.addEventListener("click", async () => {
+      const text = command.textContent;
+      let copied = false;
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+          copied = true;
+        }
+      } catch (_) {}
+      if (!copied) copied = copyWithSelection(text);
+      copy.textContent = copied ? "Copied" : "Selected — press Ctrl+C";
+      setTimeout(() => { copy.textContent = "Copy command"; }, 1600);
     });
     document.getElementById("themeToggle").addEventListener("click", () => {
       const current = document.documentElement.getAttribute("data-theme") || "light";
