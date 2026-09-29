@@ -52,13 +52,16 @@ Get-Content "$env:APPDATA\pc-remote\token"
 
 The installer copies the application to `%LOCALAPPDATA%\pc-remote` and starts it at sign-in. Open `http://127.0.0.1:8765` on that PC and enter the token. If the page does not load, run `python agent.py` from `%LOCALAPPDATA%\pc-remote` in a console and read the error.
 
-From the public page, after it is published:
+Download the repository in the browser or with `Invoke-WebRequest`, extract it, and run `install.ps1` from that folder. Do not pipe a remote script into `iex`. Windows Defender treats that pattern as a trojan dropper and blocks `powershell.exe`.
 
 ```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://pcremote.voxonlabs.com/install.ps1 | iex"
+cd $env:USERPROFILE\Downloads
+Invoke-WebRequest https://github.com/sauravsvt/pc-remote-ubuntu-mvp/archive/refs/heads/main.zip -OutFile pc-remote.zip
+Expand-Archive .\pc-remote.zip -DestinationPath . -Force
+cd .\pc-remote-ubuntu-mvp-main
+Unblock-File .\install.ps1
+.\install.ps1
 ```
-
-Review [`site/install.ps1`](site/install.ps1) before running it. It downloads this repository and runs `install.ps1`.
 
 ## Connect a phone
 

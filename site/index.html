@@ -282,7 +282,7 @@ tailscale serve status</pre>
   <script>
     const commands = {
       linux: "curl -fsSL https://pcremote.voxonlabs.com/install.sh | bash",
-      windows: "powershell -ExecutionPolicy Bypass -c \"irm https://pcremote.voxonlabs.com/install.ps1 | iex\""
+      windows: "cd $env:USERPROFILE\\Downloads\nInvoke-WebRequest https://github.com/sauravsvt/pc-remote-ubuntu-mvp/archive/refs/heads/main.zip -OutFile pc-remote.zip\nExpand-Archive .\\pc-remote.zip -DestinationPath . -Force\ncd .\\pc-remote-ubuntu-mvp-main\nUnblock-File .\\install.ps1\n.\\install.ps1"
     };
     const labels = { linux: "install.sh", windows: "install.ps1" };
     const guide = document.getElementById("guide");
