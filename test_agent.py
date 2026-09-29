@@ -177,6 +177,9 @@ class WindowsActionTests(unittest.TestCase):
         page = (ROOT / "index.html").read_text()
         self.assertIn("URLSearchParams", page)
         self.assertIn("replaceState", page)
+        self.assertIn("localStorage", page)
+        self.assertNotIn("sessionStorage.setItem", page)
+        self.assertIn("status === 401", page)
 
     def test_public_installers_download_this_repo(self):
         linux = (ROOT / "site" / "install.sh").read_text()

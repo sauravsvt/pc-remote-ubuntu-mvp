@@ -81,7 +81,7 @@ On Windows, if PowerShell cannot find `tailscale`, call `& "C:\Program Files\Tai
 
 4. Open the `https://…ts.net` address from `tailscale serve status` in the phone browser, enter the token, and add the page to the home screen.
 
-The token stays in that browser until the session ends or you press **Forget token**. Keep the token on your own devices. To add another computer, repeat the install there. The phone controls whichever address it opens.
+The token stays on that phone until you press **Forget token**. If the computer rejects it, the page clears it and asks again. Keep the token on your own devices. To add another computer, repeat the install there. The phone controls whichever address it opens.
 
 Tailscale provides the network. The application runs on the computer. A self-hosted WireGuard or Headscale network can replace Tailscale later.
 
