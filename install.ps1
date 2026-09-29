@@ -1,4 +1,4 @@
-param([switch]$PhoneOnly)
+param([switch]$PhoneOnly, [string]$ResultFile)
 $ErrorActionPreference = "Stop"
 $ProgressPreference = "SilentlyContinue"
 
@@ -87,46 +87,80 @@ function Install-Tailscale {
   Start-Sleep -Seconds 3
 }
 
+function Get-TailscaleState($cli) {
+  $raw = & $cli status --json 2>$null | Out-String
+  if (-not $raw) { return $null }
+  try { return $raw | ConvertFrom-Json } catch { return $null }
+}
+
+function Test-PagePublished($cli) {
+  $text = & $cli serve status 2>&1 | Out-String
+  return $text -match "127\.0\.0\.1:8765"
+}
+
+function Get-PhoneOrigin($cli) {
+  $serve = & $cli serve status 2>&1 | Out-String
+  $url = [regex]::Match($serve, "https://[A-Za-z0-9.-]+").Value
+  if ($url) { return $url.TrimEnd(".") }
+  $state = Get-TailscaleState $cli
+  $dns = ([string]$state.Self.DNSName).TrimEnd(".")
+  if ($dns) { return "https://$dns" }
+  return ""
+}
+
 function Request-Admin {
-  Write-Output "Approve the Windows prompt. It installs Tailscale and publishes the page to your private network."
+  Write-Output "Approve the Windows prompt. It publishes the page on your private Tailscale network."
+  $result = Join-Path $env:TEMP "pc-remote-tailscale-setup.txt"
+  Remove-Item -LiteralPath $result -Force -ErrorAction SilentlyContinue
   try {
-    $proc = Start-Process powershell.exe -Verb RunAs -Wait -PassThru -ArgumentList @(
-      "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $PSCommandPath, "-PhoneOnly"
-    )
+    Start-Process powershell.exe -Verb RunAs -Wait -ArgumentList @(
+      "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $PSCommandPath, "-PhoneOnly", "-ResultFile", $result
+    ) | Out-Null
   } catch {
     Write-Output "The prompt was closed. Install Tailscale from https://tailscale.com/download/windows, sign in, then run this installer again."
     return
   }
-  if ($proc.ExitCode -ne 0) {
-    Write-Output "Tailscale setup did not finish. Run this installer again after signing in."
+  $cli = Find-Tailscale
+  if ($cli -and (Test-PagePublished $cli)) {
+    Show-NextSteps $cli -OpenBrowser
+    return
+  }
+  if (Test-Path -LiteralPath $result) {
+    Write-Output (Get-Content -Raw -LiteralPath $result).Trim()
+  } else {
+    Write-Output "The page is not published yet. Tailscale is already signed in, so run this installer again and approve the prompt."
   }
 }
 
 function Publish-Page($cli) {
-  & $cli serve --bg --yes "http://127.0.0.1:8765"
-  if ($LASTEXITCODE -eq 0) { return 0 }
-  & $cli serve --bg "http://127.0.0.1:8765"
-  return $LASTEXITCODE
+  $first = & $cli serve --bg --yes "http://127.0.0.1:8765" 2>&1 | Out-String
+  if (Test-PagePublished $cli) { return "" }
+  $second = & $cli serve --bg "http://127.0.0.1:8765" 2>&1 | Out-String
+  if (Test-PagePublished $cli) { return "" }
+  return ($first + $second).Trim()
 }
 
-function Show-NextSteps($cli) {
-  $status = ""
-  if ($cli) { $status = & $cli serve status 2>$null }
-  $public = [regex]::Match([string]$status, "https://[^\s/]+").Value
+function Show-NextSteps($cli, [switch]$OpenBrowser) {
+  $public = Get-PhoneOrigin $cli
+  $health = ""
+  if ($cli) { $health = & $cli status 2>&1 | Out-String }
   $tokenPath = Join-Path $env:APPDATA "pc-remote\token"
   $token = ""
   if (Test-Path -LiteralPath $tokenPath) { $token = (Get-Content -Raw -LiteralPath $tokenPath).Trim() }
   $encoded = [uri]::EscapeDataString($token)
   $local = "http://127.0.0.1:8765/#token=$encoded"
-  if ($token) { Start-Process $local }
+  if ($OpenBrowser -and $token) { Start-Process $local }
   Write-Output ""
   Write-Output "This PC is opening the controls. You do not type the token there."
   if ($public -and $token) {
     Write-Output "On your phone, install the Tailscale app, sign in with the same account, then open:"
     Write-Output "$public/#token=$encoded"
     Write-Output "That link signs the phone in. Add the page to the home screen."
+    if ($health -match "Fetching TLS certificate") {
+      Write-Output "The phone link can take a minute while Tailscale finishes its certificate. Open it again if the browser complains."
+    }
   } else {
-    Write-Output "After Tailscale is signed in, run this installer again. It will open the page and print the phone link."
+    Write-Output "Tailscale is signed in. Run this installer again and it will print the phone link."
   }
   Write-Output "Do not send that link in a chat or a screenshot. Do not turn on Funnel."
 }
@@ -139,18 +173,34 @@ function Enable-PhoneAccess {
     $cli = Find-Tailscale
   }
   if (-not $cli) { throw "Tailscale was installed, but tailscale.exe still could not be found." }
-  Write-Output "Sign in to Tailscale if a browser window opens. Use the same account as your phone."
-  & $cli up
-  if ($LASTEXITCODE -ne 0) { throw "Tailscale sign-in did not finish." }
-  $code = Publish-Page $cli
-  if ($code -ne 0 -and -not (Test-Admin)) { Request-Admin; return }
-  if ($code -ne 0) { throw "Could not publish PC Remote on your private Tailscale network." }
-  Show-NextSteps $cli
+  $state = Get-TailscaleState $cli
+  if ($state -and $state.BackendState -eq "Running") {
+    Write-Output "Tailscale is already signed in on this PC."
+  } else {
+    Write-Output "Sign in to Tailscale if a browser window opens. Use the same account as your phone."
+    & $cli up
+    if ($LASTEXITCODE -ne 0) { throw "Tailscale sign-in did not finish." }
+  }
+  if (-not (Test-PagePublished $cli)) {
+    $detail = Publish-Page $cli
+    if (-not (Test-PagePublished $cli)) {
+      if (-not (Test-Admin)) { Request-Admin; return }
+      if ($detail) { throw "Could not publish PC Remote on your private Tailscale network. $detail" }
+      throw "Could not publish PC Remote on your private Tailscale network."
+    }
+  }
+  if (-not $PhoneOnly) { Show-NextSteps $cli -OpenBrowser }
 }
 
 if ($PhoneOnly) {
-  Enable-PhoneAccess
-  exit 0
+  try {
+    Enable-PhoneAccess
+    if ($ResultFile) { "ok" | Set-Content -LiteralPath $ResultFile }
+    exit 0
+  } catch {
+    if ($ResultFile) { $_.Exception.Message | Set-Content -LiteralPath $ResultFile }
+    exit 1
+  }
 }
 
 $source = Split-Path -Parent $MyInvocation.MyCommand.Path

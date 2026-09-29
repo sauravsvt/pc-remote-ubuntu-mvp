@@ -172,6 +172,8 @@ class WindowsActionTests(unittest.TestCase):
         self.assertNotIn("| iex", text.lower())
         self.assertNotIn("tailscale funnel", text.lower())
         self.assertIn("/#token=", text)
+        self.assertIn("BackendState", text)
+        self.assertIn("serve status", text)
         page = (ROOT / "index.html").read_text()
         self.assertIn("URLSearchParams", page)
         self.assertIn("replaceState", page)
