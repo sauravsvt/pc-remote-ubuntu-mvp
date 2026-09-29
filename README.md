@@ -60,6 +60,7 @@ Invoke-WebRequest https://github.com/sauravsvt/pc-remote-ubuntu-mvp/archive/refs
 Expand-Archive .\pc-remote.zip -DestinationPath . -Force
 cd .\pc-remote-ubuntu-mvp-main
 Unblock-File .\install.ps1
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 .\install.ps1
 ```
 
