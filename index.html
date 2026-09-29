@@ -22,6 +22,12 @@ const BUTTONS = new Map([
 const MONITOR_BUTTONS = [['Standby', 'monitor-standby'], ['Wake', 'monitor-on']];
 
 let key = sessionStorage.getItem('pc-remote-token') || '';
+const linked = new URLSearchParams(location.hash.replace(/^#/, '')).get('token');
+if (linked) {
+  key = linked.trim();
+  sessionStorage.setItem('pc-remote-token', key);
+  history.replaceState(null, '', location.pathname + location.search);
+}
 const $ = id => document.getElementById(id);
 const msg = (s, bad = false) => { $('message').textContent = s; $('message').className = bad ? 'error' : ''; };
 

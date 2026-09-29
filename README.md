@@ -43,7 +43,7 @@ Review [`site/install.sh`](site/install.sh) before piping it to a shell. It down
 
 ## Install on Windows
 
-Download this repository, extract it, and double-click `install.cmd`. If Python 3 is missing, that installs the official Python 3.14 build for the current user, then starts PC Remote at sign-in. You do not change system execution policy or PATH by hand.
+Download this repository, extract it, and double-click `install.cmd`. If Python 3 is missing, that installs the official Python 3.14 build for the current user. It then installs Tailscale if needed, asks you to sign in, and prints the private phone address. Approve the administrator prompt. You do not change system execution policy or PATH by hand.
 
 From PowerShell, the same steps are:
 
@@ -56,7 +56,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\pc-remote-ubuntu-mvp-main\
 
 Do not pipe a remote script into `iex`. Windows Defender treats that pattern as a trojan dropper and blocks `powershell.exe`.
 
-The app is copied to `%LOCALAPPDATA%\pc-remote`. Open `http://127.0.0.1:8765` on that PC and enter the token printed at the end, which is also in `%APPDATA%\pc-remote\token`. If the page does not load, run `python agent.py` from `%LOCALAPPDATA%\pc-remote` in a console and read the error.
+The app is copied to `%LOCALAPPDATA%\pc-remote`. The installer opens `http://127.0.0.1:8765` on that PC with the token already applied. It also prints one phone link. Install the Tailscale app on the phone, sign in with the same account, and open that link. The token is in the link, so you do not type it. Do not send the link in a chat or a screenshot. If the page does not load, run `python agent.py` from `%LOCALAPPDATA%\pc-remote` in a console and read the error.
 
 ## Connect a phone
 

@@ -165,8 +165,16 @@ class WindowsActionTests(unittest.TestCase):
         for name in ("agent.py", "windows_actions.py", "windows_audio.ps1", "index.html"):
             self.assertIn(name, text)
         self.assertIn("https://www.python.org/ftp/python/", text)
+        self.assertIn("https://pkgs.tailscale.com/stable/", text)
         self.assertIn("Python Software Foundation", text)
-        self.assertNotIn("iex", text.lower())
+        self.assertIn("127.0.0.1:8765", text)
+        self.assertNotIn("invoke-expression", text.lower())
+        self.assertNotIn("| iex", text.lower())
+        self.assertNotIn("tailscale funnel", text.lower())
+        self.assertIn("/#token=", text)
+        page = (ROOT / "index.html").read_text()
+        self.assertIn("URLSearchParams", page)
+        self.assertIn("replaceState", page)
 
     def test_public_installers_download_this_repo(self):
         linux = (ROOT / "site" / "install.sh").read_text()

@@ -232,17 +232,17 @@
       <ol class="steps">
         <li class="step">
           <h3>1. Install it on the computer</h3>
-          <p>Run the command above while you are signed in to the desktop. Then read the token and keep it on that machine.</p>
+          <p class="only-linux">Run the command above while you are signed in to the desktop, then read the token.</p>
           <pre class="only-linux">cat ~/.config/pc-remote/token</pre>
-          <pre class="only-windows">Get-Content "$env:APPDATA\pc-remote\token"</pre>
-          <p>Open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a> on that computer and enter the token. If this page does not load, the install did not finish.</p>
+          <p class="only-windows">Run the command above. The installer opens the controls on this PC, already signed in. Approve the Tailscale prompt if Windows asks.</p>
+          <p>If the page does not appear, open <a href="http://127.0.0.1:8765">http://127.0.0.1:8765</a> on that computer.</p>
         </li>
         <li class="step">
           <h3>2. Install Tailscale on that computer</h3>
           <p class="only-linux">Install Tailscale for Linux from <a href="https://tailscale.com/download/linux">tailscale.com/download/linux</a>, then sign in:</p>
           <pre class="only-linux">curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up</pre>
-          <p class="only-windows">Install Tailscale for Windows from <a href="https://tailscale.com/download/windows">tailscale.com/download/windows</a> and sign in in the Tailscale window.</p>
+          <p class="only-windows">The Windows installer downloads Tailscale if it is missing and asks you to sign in. Approve the administrator prompt. Use the same account as your phone.</p>
           <p>Use the account you will also use on the phone. Review Tailscale’s installer before piping it, the same way you review this one.</p>
         </li>
         <li class="step">
@@ -252,14 +252,15 @@ sudo tailscale up</pre>
         <li class="step">
           <h3>4. Give the phone a private address</h3>
           <p>On the computer, this publishes the page to your tailnet only. It does not put port 8765 on the public internet.</p>
-          <pre>tailscale serve --bg http://127.0.0.1:8765
+          <pre class="only-linux">tailscale serve --bg http://127.0.0.1:8765
 tailscale serve status</pre>
-          <p class="only-windows">If PowerShell cannot find <code>tailscale</code>, use <code>&amp; "C:\Program Files\Tailscale\tailscale.exe"</code> in place of <code>tailscale</code>.</p>
+          <p class="only-windows">On Windows the installer publishes the page and prints an https address ending in ts.net. You do not type this command yourself.</p>
           <p>If the command says permission denied, run it with administrator rights. Do not run <code>tailscale funnel</code>, and do not forward port 8765 on your router.</p>
         </li>
         <li class="step">
           <h3>5. Open it and keep the token</h3>
-          <p><code>tailscale serve status</code> prints an HTTPS address ending in <code>ts.net</code>. Open that address in the phone’s browser, enter the token from step 1, and use the browser menu to add the page to the home screen.</p>
+          <p class="only-linux"><code>tailscale serve status</code> prints an HTTPS address ending in <code>ts.net</code>. Open that address in the phone’s browser, enter the token from step 1, and use the browser menu to add the page to the home screen.</p>
+          <p class="only-windows">Install the Tailscale app on the phone, sign in with the same account, and open the link the installer printed. That link already contains the token. Add the page to the home screen. Do not send the link in a chat or a screenshot.</p>
           <p>The token stays in that browser until you close the session or press Forget token. Do not send the token in a chat or a screenshot.</p>
         </li>
       </ol>
