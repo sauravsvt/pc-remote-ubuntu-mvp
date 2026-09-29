@@ -8,8 +8,37 @@ foreach ($file in $files) {
   if (-not (Test-Path -LiteralPath $from)) { throw "Missing $from" }
   Copy-Item -LiteralPath $from -Destination (Join-Path $target $file) -Force
 }
-$pythonw = (Get-Command pythonw -ErrorAction SilentlyContinue).Source
-if (-not $pythonw) { throw "pythonw.exe was not found. Install Python 3 and enable Add to PATH." }
+function Find-Pythonw {
+  $candidates = @()
+  foreach ($name in @("pythonw", "python")) {
+    $cmd = Get-Command $name -ErrorAction SilentlyContinue
+    if ($cmd) { $candidates += $cmd.Source }
+  }
+  $py = Get-Command py -ErrorAction SilentlyContinue
+  if ($py) {
+    $exe = & py -3 -c "import sys; print(sys.executable)" 2>$null
+    if ($exe) { $candidates += $exe.Trim() }
+  }
+  $roots = @(
+    (Join-Path $env:LOCALAPPDATA "Programs\Python"),
+    "C:\Python",
+    (Join-Path $env:ProgramFiles "Python")
+  )
+  foreach ($root in $roots) {
+    if (Test-Path -LiteralPath $root) {
+      $candidates += @(Get-ChildItem -Path $root -Filter pythonw.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName)
+    }
+  }
+  foreach ($path in $candidates) {
+    if (-not $path) { continue }
+    $pythonw = $path
+    if ($pythonw -match "python\.exe$") { $pythonw = $pythonw -replace "python\.exe$", "pythonw.exe" }
+    if (Test-Path -LiteralPath $pythonw) { return $pythonw }
+  }
+  return $null
+}
+$pythonw = Find-Pythonw
+if (-not $pythonw) { throw "pythonw.exe was not found. Install Python 3 from https://www.python.org/downloads/windows/ and enable Add python.exe to PATH, then open a new PowerShell window." }
 Get-CimInstance Win32_Process | Where-Object {
   $_.CommandLine -and $_.CommandLine.Contains((Join-Path $target "agent.py"))
 } | ForEach-Object {
